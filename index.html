@@ -86,7 +86,7 @@ document.getElementById('certModal').classList.remove('active');
 }
 let puan=5; let yorumlar=JSON.parse(localStorage.getItem('zelora_yorum')||'[]');
 const starEl=document.getElementById('stars');
-starEl.onclick=(e)=>{puan=Math.ceil((e.offsetX/starEl.offsetWidth)*5)||5; starEl.innerText='★'.repeat(puan)+'☆'.repeat(5-puan)};
+starEl.onclick=(e)=>{let r=starEl.getBoundingClientRect(); puan=Math.ceil(((e.clientX-r.left)/r.width)*5)||5; starEl.innerText='★'.repeat(puan)+'☆'.repeat(5-puan)};
 function yorumEkle(){
 const ad=document.getElementById('yAd').value||'Anonim'; const y=document.getElementById('yYorum').value;
 if(!y) return alert('Yorum yaz fındığım!');
