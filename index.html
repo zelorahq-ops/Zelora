@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ZELORA - Ücretsiz Dijital Akademi</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box} body{font-family:Arial,sans-serif;background:#faf8ff;margin:0;color:#2d1b4e}
 header{background:white;padding:16px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;position:sticky;top:0;z-index:10}
@@ -50,7 +51,7 @@ header{background:white;padding:16px 28px;display:flex;justify-content:space-bet
 <input id="yAd" placeholder="Adın" style="width:100%;padding:10px;border-radius:10px;border:1px solid #ddd;margin-bottom:8px">
 <textarea id="yYorum" placeholder="ZELORA hakkında yorumunu yaz..." style="width:100%;padding:10px;border-radius:10px;border:1px solid #ddd;height:70px"></textarea>
 <button class="btn" style="width:100%;margin-top:8px" onclick="yorumEkle()">Yorumu Gönder</button>
-<p id="durum" style="font-size:12px;color:#888;text-align:center;margin-top:8px"></p>
+<p id="durum" style="font-size:12px;color:#888;text-align:center;margin-top:8px">Yorumlar Supabase'e kaydediliyor...</p>
 </div>
 <div id="yorumList" style="margin-top:16px"></div>
 </div>
@@ -71,6 +72,12 @@ header{background:white;padding:16px 28px;display:flex;justify-content:space-bet
 </footer>
 
 <script>
+// BURAYI KENDİ BİLGİLERİNLE DOLDUR FINDIĞIM - VERCEL'DEKİLERİN AYNISI
+const SUPABASE_URL = "https://SENIN_PROJEN.supabase.co";
+const SUPABASE_ANON_KEY = "SENIN_ANON_KEYIN";
+
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 function sertifikaYap(){
 const ad=document.getElementById('ad').value||'Zelora Öğrencisi';
 const c=document.getElementById('cert'); const ctx=c.getContext('2d');
@@ -84,18 +91,40 @@ ctx.font='14px Arial'; ctx.fillText('9 dersi tamamladı - '+new Date().toLocaleD
 const a=document.createElement('a'); a.download='ZELORA-Sertifika.png'; a.href=c.toDataURL(); a.click();
 document.getElementById('certModal').classList.remove('active');
 }
-let puan=5; let yorumlar=JSON.parse(localStorage.getItem('zelora_yorum')||'[]');
+
+let puan=5;
 const starEl=document.getElementById('stars');
 starEl.onclick=(e)=>{let r=starEl.getBoundingClientRect(); puan=Math.ceil(((e.clientX-r.left)/r.width)*5)||5; starEl.innerText='★'.repeat(puan)+'☆'.repeat(5-puan)};
-function yorumEkle(){
-const ad=document.getElementById('yAd').value||'Anonim'; const y=document.getElementById('yYorum').value;
+
+async function yorumEkle(){
+const ad=document.getElementById('yAd').value||'Anonim'; 
+const y=document.getElementById('yYorum').value;
 if(!y) return alert('Yorum yaz fındığım!');
-yorumlar.unshift({ad,yorum:y,puan}); localStorage.setItem('zelora_yorum',JSON.stringify(yorumlar)); document.getElementById('yYorum').value=''; listele();
+document.getElementById('durum').innerText='Gönderiliyor...';
+
+const { error } = await supabaseClient.from('reviews').insert([{ name: ad, comment: y, rating: puan }]);
+if(error){
+  document.getElementById('durum').innerText='Hata: '+error.message;
+  alert('Hata: '+error.message+' - Supabase URL ve KEY kontrol et!');
+} else {
+  document.getElementById('durum').innerText='Kaydedildi!';
+  document.getElementById('yYorum').value=''; 
+  document.getElementById('yAd').value='';
+  listele();
 }
-function listele(){
-let t=0; const list=document.getElementById('yorumList');
-list.innerHTML=yorumlar.map(r=>{t+=r.puan; return `<div class="yorum-item"><b>${r.ad}</b> ${'★'.repeat(r.puan)}<p style="margin:4px 0 0;font-size:13px">${r.yorum}</p></div>`}).join('');
-if(yorumlar.length){document.getElementById('avg').innerText=(t/yorumlar.length).toFixed(1); document.getElementById('count').innerText=yorumlar.length; document.getElementById('ortPuan').innerText='⭐ '+(t/yorumlar.length).toFixed(1)}
+}
+
+async function listele(){
+const list=document.getElementById('yorumList');
+const { data, error } = await supabaseClient.from('reviews').select('*').order('created_at', {ascending: false});
+if(error){ list.innerHTML=`<p style="color:red;text-align:center">Supabase bağlantı hatası: ${error.message}<br>URL ve KEY'i kontrol et!</p>`; return; }
+if(!data || data.length===0){ list.innerHTML="<p style='text-align:center;color:#999'>Henüz yorum yok, ilk sen yaz!</p>"; document.getElementById('count').innerText=0; return; }
+
+let t=0;
+list.innerHTML=data.map(r=>{ t+=(r.rating||5); return `<div class="yorum-item"><b>${r.name}</b> ${'★'.repeat(r.rating||5)}<p style="margin:4px 0 0;font-size:13px">${r.comment}</p><span style="font-size:11px;color:#999">${new Date(r.created_at).toLocaleString('tr-TR')}</span></div>`}).join('');
+document.getElementById('avg').innerText=(t/data.length).toFixed(1);
+document.getElementById('count').innerText=data.length;
+document.getElementById('ortPuan').innerText='⭐ '+(t/data.length).toFixed(1);
 }
 listele();
 </script>
